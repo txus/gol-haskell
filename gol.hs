@@ -55,8 +55,8 @@ nextBoard :: Board -> Board
 nextBoard board = map (nextCell board) board
 
 place :: Cell -> Board -> Board
-place cell board = let newCoord = coord cell in
-                       map (\old -> if (coord old) == newCoord then cell else old) board
+place cell = let newCoord = coord cell in
+                 map (\old -> if (coord old) == newCoord then cell else old)
 
 every :: (Monad m, MonadIO m) => Float -> m a -> m ()
 every secs action = do action
