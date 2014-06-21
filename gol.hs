@@ -3,6 +3,7 @@ import Data.List
 import Control.Concurrent (threadDelay)
 import Control.Monad.State
 import Data.Foldable (fold)
+import Data.Function
 
 type Board = [Cell]
 type Coordinate = (Int, Int)
@@ -17,21 +18,21 @@ newBoard :: Int -> Int -> Board
 newBoard x y = [Dead (x',y') | x' <- [0..(x - 1)], y' <- [0..(y - 1)]]
 
 showBoard :: Board -> String
-showBoard = fold . (intersperse "\n") . (map (fold . map show) . rows)
+showBoard = fold . intersperse "\n" . map (fold . map show) . rows
 
 sortWith :: Ord b => (a -> b) -> [a] -> [a]
-sortWith f = sortBy (\x y -> compare (f x) (f y))
+sortWith f = sortBy (compare `on` f)
 
 rows :: Board -> [[Cell]]
-rows = groupBy (\a b -> (snd (coord a)) == (snd (coord b))) . sortWith (snd . coord)
+rows = groupBy (\a b -> snd (coord a) == snd (coord b)) . sortWith (snd . coord)
 
 coord :: Cell -> Coordinate
 coord (Alive c) = c
 coord (Dead c) = c
 
 lookupCell :: Board -> Coordinate -> Cell
-lookupCell board (x, y) = let matching = filter ((==)(x,y) . coord) board in
-                              if length matching == 1 then head matching else Dead (x, y)
+lookupCell board (x, y) = let matching = filter ((==)(x,y) . coord) board
+                          in if length matching == 1 then head matching else Dead (x, y)
 
 neighboringCoords :: Coordinate -> [Coordinate]
 neighboringCoords (x, y) = [(x',y') | x' <- [x+1, x, x-1], y' <- [y+1, y, y-1], (x,y) /= (x',y')]
@@ -49,22 +50,22 @@ nextCell board cell = case cell of
                           n | n `elem` [2..3] -> Alive c
                           _ -> Dead c
                         (Dead c) -> if length (aliveNeighbors c) == 3 then Alive c else Dead c
-  where aliveNeighbors coordinate = filter isAlive (neighbors board coordinate)
+  where aliveNeighbors coordinate = filter isAlive $ neighbors board coordinate
 
 nextBoard :: Board -> Board
 nextBoard board = map (nextCell board) board
 
 place :: Cell -> Board -> Board
-place cell = let newCoord = coord cell in
-                 map (\old -> if (coord old) == newCoord then cell else old)
+place cell = let newCoord = coord cell
+             in map (\old -> if coord old == newCoord then cell else old)
 
 every :: (Monad m, MonadIO m) => Float -> m a -> m ()
-every secs action = do action
-                       liftIO $ threadDelay $ floor (secs * 1000000.0)
+every secs action = do _ <- action
+                       liftIO . threadDelay . floor $ secs * 1000000.0
                        every secs action
 
 foreverEvolveAndPrint :: Board -> IO ()
-foreverEvolveAndPrint board = runStateT infiniteLoop board >> return ()
+foreverEvolveAndPrint board = void $ runStateT infiniteLoop board
   where infiniteLoop = every 0.5 $ getAndEvolveBoard >>= (liftIO . putStrLn . (++ "\n") . showBoard)
 
 getAndEvolveBoard :: StateT Board IO Board
